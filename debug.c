@@ -37,6 +37,7 @@ Node* createNode(int compCode, int suburbCode, const char *suburbName, int year,
     newNode->stateCode = strdup(stateCode);
     newNode->stateName = strdup(stateName);
     newNode->LGACode = strdup(LGACode);
+    printf("LGACode write: %s", LGACode);
     newNode->LGAName = strdup(LGAName);
     newNode->latitude = latitude;
     newNode->longitude = longitude;
@@ -81,12 +82,17 @@ void readCSV(const char *filename, Dict1 *dict1) {
         char LGACode[BUFFER], LGAName[BUFFER];
         double latitude, longitude;
 
+        // Debug print the line
+        printf("Processing line: %s", line);
+
         // Read first four fields
         char *rest = line;
         if (sscanf(rest, "%d,%d,%[^,],%d,", &compCode, &suburbCode, suburbName, &year) != 4) {
             fprintf(stderr, "Error: Incorrect format for first four fields.\n");
             continue;
         }
+        printf("compCode: %d, suburbCode: %d, suburbName: %s, year: %d\n",
+               compCode, suburbCode, suburbName, year);
 
         // Move the pointer to the part of the line after the 4th field
         rest = strchr(rest, ',');
@@ -115,12 +121,14 @@ void readCSV(const char *filename, Dict1 *dict1) {
                 rest = comma + 1;
             }
         }
+        printf("stateCode: %s\n", stateCode);
 
         // Read stateName and move the pointer
         if (sscanf(rest, "%[^,],", stateName) != 1) {
             fprintf(stderr, "Error: Incorrect format for stateName.\n");
             continue;
         }
+        printf("stateName: %s\n", stateName);
 
         // Move to the next field after stateName
         rest = strchr(rest, ',');
@@ -146,6 +154,7 @@ void readCSV(const char *filename, Dict1 *dict1) {
                 rest = comma + 1;
             }
         }
+        printf("LGACode: %s\n", LGACode);
 
         // Read LGAName (multiple names in quotes) and move to the next field
         if (rest[0] == '"') {
@@ -167,17 +176,20 @@ void readCSV(const char *filename, Dict1 *dict1) {
                 rest = comma + 1;
             }
         }
+        printf("LGAName: %s\n", LGAName);
 
         // Read latitude and longitude
         if (sscanf(rest, "%lf,%lf", &latitude, &longitude) != 2) {
             fprintf(stderr, "Error: Incorrect format for latitude and longitude.\n");
             continue;
         }
+        printf("latitude: %lf, longitude: %lf\n", latitude, longitude);
 
         // Create a new node with the parsed data
         Node *newNode = createNode(compCode, suburbCode, suburbName, year,
                                    stateCode, stateName, LGACode, LGAName,
                                    latitude, longitude);
+       printf("LGACode parse: %s", LGACode);
 
         // Insert the new node into the linked list
         appendNode(dict1, newNode);
@@ -198,101 +210,6 @@ void printList(Dict1 *dict1) {
     }
 }
 
-// Function to search records based on the official suburb name
-Node* searchRecords(Dict1 *dict1, const char *query) {
-    Node *resultsHead = NULL;
-    Node *resultsTail = NULL;
-    Node *current = dict1->head;
-
-    while (current != NULL) {
-        if (strcmp(current->suburbName, query) == 0) {
-            Node *newResult = (Node*)malloc(sizeof(Node));
-            *newResult = *current;  // Copy node data
-            newResult->next = NULL;
-
-            if (resultsHead == NULL) {
-                resultsHead = newResult;
-                resultsTail = newResult;
-            } else {
-                resultsTail->next = newResult;
-                resultsTail = newResult;
-            }
-        }
-        current = current->next;
-    }
-
-    return resultsHead;
-}
-
-// Function to write results to a file
-void writeResultsToFile(const char *filename, Node *resultsHead) {
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        perror("Error opening file for writing");
-        exit(EXIT_FAILURE);
-    }
-
-    Node *current = resultsHead;
-    int recordCount = 0;
-
-    while (current != NULL) {
-        fprintf(file, "%d,%d,%s,%d,%s,%s,%s,%s,%lf,%lf\n",
-                current->compCode, current->suburbCode, current->suburbName,
-                current->year, current->stateCode, current->stateName,
-                current->LGACode, current->LGAName, current->latitude, current->longitude);
-        recordCount++;
-        current = current->next;
-    }
-
-    if (recordCount == 0) {
-        fprintf(file, "NOTFOUND\n");
-    }
-
-    fclose(file);
-}
-
-// Function to count the number of matching records
-int countRecords(Node *resultsHead) {
-    int count = 0;
-    Node *current = resultsHead;
-    while (current != NULL) {
-        count++;
-        current = current->next;
-    }
-    return count;
-}
-
-// Function to process queries from stdin
-void processQueries(Dict1 *dict1, const char *outputFilename) {
-    char query[BUFFER];
-
-    while (fgets(query, sizeof(query), stdin)) {
-        // Remove newline character from query
-        size_t len = strlen(query);
-        if (len > 0 && query[len - 1] == '\n') {
-            query[len - 1] = '\0';
-        }
-
-        // Search for records
-        Node *resultsHead = searchRecords(dict1, query);
-
-        // Write results to file
-        writeResultsToFile(outputFilename, resultsHead);
-
-        // Count and print the number of records found
-        int recordCount = countRecords(resultsHead);
-        printf("Number of records found: %d\n", recordCount);
-
-        // Free memory used for results (Could be useful elsewhere)
-        while (resultsHead != NULL) {
-            Node *temp = resultsHead;
-            resultsHead = resultsHead->next;
-            free(temp);
-        }
-    }
-}
-
-
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <csv_file>\n", argv[0]);
@@ -306,7 +223,7 @@ int main(int argc, char *argv[]) {
     }
 
     readCSV(argv[1], dict1);
-    processQueries(dict1, argv[2]);
+    printList(dict1);
 
     return EXIT_SUCCESS;
 }
